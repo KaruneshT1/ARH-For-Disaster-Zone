@@ -23,7 +23,7 @@ class RoverSLAM:
         self.map = np.zeros(map_size)  # Initialize map with free spaces (0s)
         self.position = (map_size[0] // 2, map_size[1] // 2)  # Start at the center
         self.orientation = 0  # Rover's initial orientation (angle in degrees)
-        self.goal = None  # Destination coordinates
+        self.goals = []  # List of goal positions
         self.path = []  # Path calculated using Dijkstra’s Algorithm
 
         logging.info(f"SLAM system initialized with map size {map_size}")
@@ -34,25 +34,49 @@ class RoverSLAM:
             if 0 <= obs[0] < self.map.shape[0] and 0 <= obs[1] < self.map.shape[1]:
                 self.map[obs] = 1
 
-    def set_goal(self, goal_position):
-        """Sets the goal position for path planning."""
-        if not (isinstance(goal_position, tuple) and len(goal_position) == 2):
-            raise SLAMError("Goal position must be a tuple (x, y).")
+    def set_goals(self, goal_positions):
+        """Sets multiple goal positions for path planning."""
+        if not isinstance(goal_positions, list) or not all(isinstance(goal, tuple) and len(goal) == 2 for goal in goal_positions):
+            raise SLAMError("Goal positions must be a list of tuples (x, y).")
+        
+        self.goals = goal_positions
+        logging.info(f"Goals set to {self.goals}")
 
-        if not (0 <= goal_position[0] < self.map.shape[0] and 0 <= goal_position[1] < self.map.shape[1]):
-            raise SLAMError("Goal position is out of map bounds.")
-
-        self.goal = goal_position
-        logging.info(f"Goal set to {goal_position}")
+    def find_nearest_goal(self):
+        """Find the nearest goal from the current position using Dijkstra’s Algorithm."""
+        if not self.goals:
+            raise SLAMError("No goals set.")
+        
+        nearest_goal = None
+        shortest_distance = float('inf')
+        for goal in self.goals:
+            path = dijkstra_path(self.map, self.position, goal)
+            if path:
+                distance = len(path)
+                if distance < shortest_distance:
+                    shortest_distance = distance
+                    nearest_goal = goal
+        
+        if nearest_goal is not None:
+            return nearest_goal
+        else:
+            return None
 
     def dijkstra_path(self):
         """Uses the dijkstra_path function from pathfinding.py to find the shortest path."""
-        if not self.goal:
-            raise SLAMError("Goal position not set.")
+        if not self.goals:
+            raise SLAMError("Goal positions not set.")
         
-        self.path = dijkstra_path(self.map, self.position, self.goal)
+        # Find nearest goal
+        nearest_goal = self.find_nearest_goal()
+        if not nearest_goal:
+            logging.error("No valid path found to any goal.")
+            self.path = []
+            return
+        
+        self.path = dijkstra_path(self.map, self.position, nearest_goal)
         if self.path:
-            logging.info(f"Path found: {self.path}")
+            logging.info(f"Path found to nearest goal: {self.path}")
         else:
             logging.error("No valid path found.")
             self.path = []
@@ -65,10 +89,16 @@ class RoverSLAM:
 
         self.position = self.path.pop(0)
         logging.info(f"Rover moved to {self.position}")
+
+        # If the rover reaches the current goal, remove it from the list of goals
+        if self.position == self.goals[0]:
+            self.goals.pop(0)
+            logging.info(f"Reached goal {self.position}. Remaining goals: {self.goals}")
+
         return True
 
     def display_map(self):
-        """Displays the SLAM map with obstacles, rover, goal, and path."""
+        """Displays the SLAM map with obstacles, rover, goals, and path."""
         os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal screen
 
         display_grid = np.full(self.map.shape, '.', dtype=str)
@@ -82,11 +112,10 @@ class RoverSLAM:
         for px, py in self.path:
             display_grid[px, py] = '*'
 
-        # Mark rover and goal
+        # Mark rover and goals
         x, y = self.position
         display_grid[x, y] = 'R'
-        if self.goal:
-            gx, gy = self.goal
+        for gx, gy in self.goals:
             display_grid[gx, gy] = 'G'
 
         # Print the map
@@ -96,6 +125,19 @@ class RoverSLAM:
 
     def simulate_movement(self, delay=0.5):
         """Simulates rover movement step by step with visualization."""
-        while self.move_to_next_position():
-            self.display_map()
-            time.sleep(delay)
+        while self.goals:
+            # If there are no goals left, stop
+            if not self.goals:
+                logging.info("All goals reached!")
+                break
+
+            self.dijkstra_path()  # Plan the path to the next goal
+            
+            while self.move_to_next_position():
+                self.display_map()
+                time.sleep(delay)
+
+            # If no path is found to the goal, break out of the simulation
+            if not self.path:
+                logging.error("Unable to find a path to the goal. Stopping.")
+                break

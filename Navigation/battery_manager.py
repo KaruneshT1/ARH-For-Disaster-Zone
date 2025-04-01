@@ -41,7 +41,7 @@ class BatteryManager:
         return {
             "status": self.status,
             "battery": self.battery_level,
-            "coordinates": [174, 122],  # Placeholder coordinates for simplicity
+            "coordinates": [174, 122],  # Placeholder coordinates
         }
 
     def get_detailed_status(self):
