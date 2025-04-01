@@ -6,10 +6,10 @@ if __name__ == "__main__":
     # Create an instance of RoverSLAM with a map size of 20x20
     slam = RoverSLAM(map_size=(20, 20))
 
-    slam.position = (5, 2)  # Set rover's position to (5, 5)
+    slam.position = (9, 2)  # Set rover's position to (5, 5)
 
     # Manually set obstacles (locations where the rover cannot move)
-    obstacles = [(5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5)]
+    obstacles = [(5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5),(12, 5), (13, 5), (14, 5), (15, 5), (16, 5), (17, 5), (18, 5), (19, 5)]
     slam.set_obstacles(obstacles)
 
     # Set the goal position for the rover to reach
