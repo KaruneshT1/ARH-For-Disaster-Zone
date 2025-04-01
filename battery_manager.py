@@ -1,5 +1,5 @@
 import time
-from api_comm import get_rover_status, move_rover, stop_rover
+from ARH.Navigation.api_comm import get_rover_status, move_rover, stop_rover
 
 # Monitor battery and handle recharging
 def monitor_battery(session_id):

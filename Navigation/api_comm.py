@@ -8,7 +8,7 @@ class APIComm:
 
     @staticmethod
     def start_session():
-        url = f"https://roverdata2-production.up.railway.app/api/session/start"
+        url = "https://roverdata2-production.up.railway.app/api/session/start"
         response = requests.post(url)
         if response.status_code == 200:
             session_data = response.json()

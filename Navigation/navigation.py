@@ -1,11 +1,11 @@
-from sensor_handler import SensorHandler
-from api_comm import APIComm  # Assuming the API communication is in api_comm.py
+from ARH.Navigation.sensor_handler import SensorHandler
+from ARH.Navigation.api_comm import APIComm  # Assuming the API communication is in api_comm.py
 
 class RoverNavigation:
-    def __init__(self, session_id, rover_id):
+    def __init__(self, session_id, rover_id="Rover1"):
         self.session_id = session_id
         self.rover_id = rover_id
-        self.api = APIComm(session_id)
+        self.api = APIComm(session_id, rover_id)  # APIComm is initialized with session_id and rover_id
         self.sensor_handler = SensorHandler(session_id, rover_id)
 
     def move_forward(self):

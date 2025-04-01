@@ -1,14 +1,18 @@
 from flask import Flask, jsonify
-from navigation import RoverNavigation
-from api_comm import APIComm
+from ARH.Navigation.navigation import RoverNavigation
+from ARH.Navigation.api_comm import APIComm
 
 app = Flask(__name__)
 
-# Initialize the rover with session ID and rover ID
-session_id = "your_session_id"
-rover_id = "Rover1"  # Example rover ID
+# Initialize APIComm to start a session
+api_comm = APIComm()
 
-rover_navigation = RoverNavigation(session_id, rover_id)
+# Start a session and get session_id
+session_id = api_comm.start_session()
+
+# Initialize the rover with session ID and rover ID
+rover_id = "Rover1"  # Example rover ID
+rover_navigation = RoverNavigation(session_id, rover_id, api_comm)
 
 @app.route('/move_forward', methods=['POST'])
 def move_forward():
@@ -32,7 +36,7 @@ def move_right():
 
 @app.route('/get_sensor_data', methods=['GET'])
 def get_sensor_data():
-    sensor_data = rover_navigation.sensor_handler.get_sensor_data()
+    sensor_data = rover_navigation.get_sensor_data()
     return jsonify(sensor_data)
 
 if __name__ == '__main__':
