@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rover Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .container { padding: 20px; max-width: 800px; margin: 0 auto; }
+        .status { margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
+        .status p { margin: 5px 0; }
+        button { 
+            margin: 5px; 
+            padding: 10px 15px; 
+            background-color: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            transition: background-color 0.3s;
+        }
+        button:hover { background-color: #45a049; }
+        button.stop { background-color: #f44336; }
+        button.stop:hover { background-color: #d32f2f; }
+        button.recharge { background-color: #2196F3; }
+        button.recharge:hover { background-color: #0b7dda; }
+        .controls { margin: 20px 0; display: flex; flex-direction: column; align-items: center; }
+        .direction-pad { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 5px; margin-bottom: 20px; }
+        .direction-pad button { height: 60px; width: 80px; font-weight: bold; }
+        .direction-pad .center { visibility: hidden; }
+        .utility-controls { display: flex; justify-content: center; gap: 15px; margin-top: 10px; }
+        .utility-controls button { width: 130px; }
+        .sensor-data { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; }
+        .error { color: red; padding: 10px; background-color: #ffebee; border-radius: 4px; margin: 10px 0; }
+        .success { color: green; padding: 10px; background-color: #e8f5e9; border-radius: 4px; margin: 10px 0; }
+        #message { margin-top: 15px; }
+        h2 { margin-top: 30px; color: #333; text-align: center; }
+        .session-controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        
+        /* New styles for sensor data display */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-gap: 15px;
+        }
+        .sensor-box {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            background-color: #f8f9fa;
+        }
+        .sensor-box h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 16px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .sensor-value {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        
+        /* New styles for position information */
+        .position-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 5px;
+        }
+        
+        /* New styles for package status and recharge status */
+        .package-status {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border: 2px solid #4CAF50;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            color: #2E7D32;
+        }
+        
+        .recharge-status {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border: 2px solid #2196F3;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            color: #0D47A1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center;">Rover Control</h1>
+        <div class="session-controls">
+            <button onclick="startSession()">Start Session</button>
+            <button onclick="fetchRoverStatus()">Refresh Status</button>
+            <button class="auto-navigate" onclick="startAutoNavigation()" style="background-color: #FF9800;">Start Auto Navigation</button>
+        </div>
+        
+        <div class="status">
+            <p><strong>Session ID:</strong> <span id="session-id">Not Started</span></p>
+            <p><strong>Rover Status:</strong> <span id="rover-status">Unknown</span></p>
+            <p><strong>Battery Level:</strong> <span id="battery-level">Unknown</span></p>
+            <p><strong>Communication Status:</strong> <span id="communication-status">Unknown</span></p>
+        </div>
+        
+        <div class="position-info">
+            <h3 style="margin-top: 0; color: #333;">Position Information</h3>
+            <p><strong>Initial Position:</strong> <span id="initial-position">Not set</span></p>
+            <p><strong>Current Position:</strong> <span id="current-position">Unknown</span></p>
+            <p><strong>Final Position:</strong> <span id="final-position">Not reached</span></p>
+            <p><strong>Navigation Status:</strong> <span id="navigation-status">Not started</span></p>
+            <p><strong>Battery Level:</strong> <span id="battery-level">Unknown</span></p>
+            <div id="package-status" class="package-status" style="display: none;"></div>
+            <div id="recharge-status" class="recharge-status" style="display: none;"></div>
+        </div>
+        
+        <h2>Movement Controls</h2>
+        <div class="controls">
+            <div class="direction-pad">
+                <div></div>
+                <button onclick="moveRover('forward')">Forward</button>
+                <div></div>
+                <button onclick="moveRover('left')">Left</button>
+                <div class="center"></div>
+                <button onclick="moveRover('right')">Right</button>
+                <div></div>
+                <button onclick="moveRover('backward')">Backward</button>
+                <div></div>
+            </div>
+            
+            <div class="utility-controls">
+                <button class="stop" onclick="stopRover()">Stop Rover</button>
+                <button class="recharge" onclick="rechargeRover()">Recharge</button>
+            </div>
+        </div>
+        
+        <h2>Sensor Data</h2>
+        <div style="text-align: center; margin-bottom: 15px;">
+            <button onclick="fetchSensorData()">Get Sensor Data</button>
+        </div>
+        <div id="sensor-data" class="sensor-data">
+            <p>No sensor data available</p>
+        </div>
+        
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // Auto-refresh interval (in milliseconds)
+        const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds
+        let autoRefreshIntervalId = null;
+        
+        // Function to start auto-refresh of sensor data
+        function startAutoRefresh() {
+            // Clear any existing interval first
+            if (autoRefreshIntervalId) {
+                clearInterval(autoRefreshIntervalId);
+            }
+            
+            // Set up new interval for auto-refresh
+            autoRefreshIntervalId = setInterval(() => {
+                // Only refresh if we have an active session
+                if (document.getElementById('session-id').innerText !== 'Not Started') {
+                    fetchSensorData(false); // Don't show success message for auto-refresh
+                }
+            }, AUTO_REFRESH_INTERVAL);
+        }
+        
+        // Function to stop auto-refresh
+        function stopAutoRefresh() {
+            if (autoRefreshIntervalId) {
+                clearInterval(autoRefreshIntervalId);
+                autoRefreshIntervalId = null;
+            }
+        }
+
+        // Start a new session
+        async function startSession() {
+            try {
+                const response = await fetch('/start-session', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.session_id) {
+                    document.getElementById('session-id').innerText = data.session_id;
+                    displayMessage('Session started successfully!', 'success');
+                    
+                    // Fetch initial rover status and sensor data
+                    await fetchRoverStatus();
+                    await fetchSensorData();
+                    
+                    // Start auto-refresh when session starts
+                    startAutoRefresh();
+                } else {
+                    displayMessage('Failed to start session: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                displayMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Fetch rover status
+        async function fetchRoverStatus() {
+            try {
+                const response = await fetch('/rover/status');
+                const data = await response.json();
+                
+                if (data.error) {
+                    displayMessage(data.error, 'error');
+                    return;
+                }
+                
+                document.getElementById('rover-status').innerText = data.status || 'Unknown';
+                document.getElementById('battery-level').innerText = (data.battery ? data.battery + '%' : 'Unknown');
+                document.getElementById('communication-status').innerText = data.communication_status || 'Unknown';
+                
+                // Also fetch sensor data when status is updated
+                await fetchSensorData(false); // Don't show success message to avoid too many notifications
+                
+                displayMessage('Status updated', 'success');
+            } catch (error) {
+                displayMessage('Error fetching status: ' + error.message, 'error');
+            }
+        }
+
+        // Fetch sensor data with optional message display
+        async function fetchSensorData(showMessage = true) {
+            try {
+                const response = await fetch('/rover/sensor-data');
+                const data = await response.json();
+                
+                if (data.error) {
+                    if (showMessage) displayMessage(data.error, 'error');
+                    return;
+                }
+                
+                console.log("Raw sensor data:", data); // Log the data for debugging
+                
+                // Updated to create a structured view of the sensor data
+                let sensorHTML = '<div class="sensor-grid">';
+                
+                // Timestamp
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Timestamp</h3>
+                        <p>Time: <span class="sensor-value">${data.readable_time || 'N/A'}</span></p>
+                        <p>Unix: <span class="sensor-value">${data.timestamp || 'N/A'}</span></p>
+                    </div>`;
+                
+                // Battery and Recharging Status
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Power Status</h3>
+                        <p>Battery: <span class="sensor-value">${
+                            data.battery_level !== undefined ? 
+                            data.battery_level + '%' : 
+                            (data.battery !== undefined ? data.battery + '%' : 'N/A')
+                        }</span></p>
+                        <p>Recharging: <span class="sensor-value">${data.recharging === true ? 'Yes' : 'No'}</span></p>
+                    </div>`;
+                
+                // IR Sensor
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>IR Sensor</h3>
+                        <p>Reflection: <span class="sensor-value">${
+                            data.ir ? 
+                            (data.ir.reflection === true ? 'Yes (true)' : 'No (false)') : 
+                            'N/A'
+                        }</span></p>
+                    </div>`;
+                
+                // Position
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Position</h3>
+                        <p>X: <span class="sensor-value">${data.position ? data.position.x || 'N/A' : 'N/A'}</span></p>
+                        <p>Y: <span class="sensor-value">${data.position ? data.position.y || 'N/A' : 'N/A'}</span></p>
+                    </div>`;
+                
+                // Accelerometer
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Accelerometer</h3>
+                        <p>X: <span class="sensor-value">${data.accelerometer ? data.accelerometer.x || 'N/A' : 'N/A'}</span></p>
+                        <p>Y: <span class="sensor-value">${data.accelerometer ? data.accelerometer.y || 'N/A' : 'N/A'}</span></p>
+                        <p>Z: <span class="sensor-value">${data.accelerometer ? data.accelerometer.z || 'N/A' : 'N/A'}</span></p>
+                    </div>`;
+                
+                // Ultrasonic
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Ultrasonic</h3>
+                        <p>Distance: <span class="sensor-value">${
+                            data.ultrasonic ? 
+                            (data.ultrasonic.distance !== null ? 
+                                data.ultrasonic.distance + ' cm' : 'No reading') : 
+                            'N/A'
+                        }</span></p>
+                        <p>Object Detected: <span class="sensor-value">${
+                            data.ultrasonic ? 
+                            (data.ultrasonic.detection === true ? 'Yes' : 'No') : 
+                            'N/A'
+                        }</span></p>
+                    </div>`;
+                
+                // RFID
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>RFID</h3>
+                        <p>Tag Detected: <span class="sensor-value">${
+                            data.rfid ? 
+                            (data.rfid.tag_detected === true ? 'Yes' : 'No') : 
+                            'N/A'
+                        }</span></p>
+                        ${data.rfid && data.rfid.tag_id ? 
+                          `<p>Tag ID: <span class="sensor-value">${data.rfid.tag_id}</span></p>` : 
+                          ''}
+                    </div>`;
+                
+                // Communication Status
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Communication Status</h3>
+                        <p>Status: <span class="sensor-value">${data.communication_status || 'Unknown'}</span></p>
+                    </div>`;
+                
+                sensorHTML += '</div>';
+                
+                document.getElementById('sensor-data').innerHTML = sensorHTML;
+                
+                // Update main status panel with the latest data
+                if (data.communication_status) {
+                    document.getElementById('communication-status').innerText = data.communication_status;
+                }
+                if (data.battery_level !== undefined) {
+                    document.getElementById('battery-level').innerText = data.battery_level + '%';
+                } else if (data.battery !== undefined) {
+                    document.getElementById('battery-level').innerText = data.battery + '%';
+                }
+                
+                if (showMessage) {
+                    displayMessage('Sensor data retrieved', 'success');
+                }
+            } catch (error) {
+                if (showMessage) {
+                    displayMessage('Error fetching sensor data: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Move the rover
+        async function moveRover(direction) {
+            try {
+                const response = await fetch(`/rover/move/${direction}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.error) {
+                    displayMessage(data.error, 'error');
+                } else {
+                    displayMessage(data.message || 'Rover moved successfully', 'success');
+                    
+                    // Refresh data after movement with delay to allow server to update
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
+                }
+            } catch (error) {
+                displayMessage('Error moving rover: ' + error.message, 'error');
+            }
+        }
+
+        // Recharge the rover
+        async function rechargeRover() {
+            try {
+                const response = await fetch('/rover/recharge', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.error) {
+                    displayMessage(data.error, 'error');
+                } else {
+                    displayMessage(data.message || 'Rover is recharging', 'success');
+                    
+                    // Refresh data after recharge command
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
+                }
+            } catch (error) {
+                displayMessage('Error recharging rover: ' + error.message, 'error');
+            }
+        }
+
+        // Stop the rover
+        async function stopRover() {
+            try {
+                const response = await fetch('/rover/stop', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.error) {
+                    displayMessage(data.error, 'error');
+                } else {
+                    displayMessage(data.message || 'Rover stopped', 'success');
+                    
+                    // Refresh data after stop command
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
+                }
+            } catch (error) {
+                displayMessage('Error stopping rover: ' + error.message, 'error');
+            }
+        }
+
+        // Auto-navigate the rover
+        async function startAutoNavigation() {
+            try {
+                displayMessage('Starting auto navigation...', 'success');
+                document.getElementById('navigation-status').innerText = 'In progress...';
+                
+                const response = await fetch('/auto-navigate/start', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    displayMessage(data.error, 'error');
+                    document.getElementById('navigation-status').innerText = 'Failed';
+                    return;
+                }
+                
+                // Update position data
+                if (data.initial_position) {
+                    document.getElementById('initial-position').innerText = 
+                        `X: ${data.initial_position.x}, Y: ${data.initial_position.y}`;
+                }
+                
+                // Auto-refresh position data during navigation
+                checkNavigationStatus();
+                
+                displayMessage('Auto navigation started', 'success');
+            } catch (error) {
+                displayMessage('Error: ' + error.message, 'error');
+                document.getElementById('navigation-status').innerText = 'Error';
+            }
+        }
+        
+        // Check navigation status periodically
+        function checkNavigationStatus() {
+            const statusCheckInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/auto-navigate/status');
+                    const data = await response.json();
+                    
+                    // Update current position
+                    if (data.current_position) {
+                        document.getElementById('current-position').innerText = 
+                            `X: ${data.current_position.x}, Y: ${data.current_position.y}`;
+                    }
+                    
+                    // Update final position if navigation is complete
+                    if (data.final_position) {
+                        document.getElementById('final-position').innerText = 
+                            `X: ${data.final_position.x}, Y: ${data.final_position.y}`;
+                    }
+                    
+                    // Update battery level if available
+                    if (data.battery_level !== undefined) {
+                        document.getElementById('battery-level').innerText = 
+                            `${data.battery_level}%`;
+                        
+                        // Add color coding for battery level
+                        const batteryLevel = parseInt(data.battery_level);
+                        const batteryElement = document.getElementById('battery-level');
+                        
+                        if (batteryLevel <= 5) {
+                            batteryElement.style.color = 'red';
+                            batteryElement.style.fontWeight = 'bold';
+                        } else if (batteryLevel <= 20) {
+                            batteryElement.style.color = 'orange';
+                            batteryElement.style.fontWeight = 'bold';
+                        } else if (batteryLevel >= 80) {
+                            batteryElement.style.color = 'green';
+                        } else {
+                            batteryElement.style.color = 'black';
+                        }
+                    }
+                    
+                    // Update navigation status
+                    if (data.status) {
+                        document.getElementById('navigation-status').innerText = data.status;
+                        
+                        // Check for package drop or recharging status
+                        const packageStatus = document.getElementById('package-status');
+                        const rechargeStatus = document.getElementById('recharge-status');
+                        
+                        // Handle package drop notification
+                        if (data.status.includes("Supply") || data.status.includes("Completed")) {
+                            packageStatus.style.display = 'block';
+                            packageStatus.innerText = 'THE PACKAGE IS DROPPED!';
+                            
+                            // Add notification sound when package is dropped
+                            try {
+                                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJUBgZQJ3r+dq0gjkYJHOt+/3w1a9cIw0lZbX///7+9ti778WQakAQFjyJ0/z///////jIqXpIHRQtdL////vcs3ZAGiSDxfv////8v3RFGiBxuPf//////MJ8TB0aS5ju////+sd/RRgfYqrx/////8yKTxkbQpDm/////82JRBQbSJfq//////nKhz8VHky88P////+7ZycaPovjzqH/////8vbr5uDCjVUlET7J8P////////////////////+VTyIP2f/////////////////////UdzQQ0P/////////////////////crG0O7/////////////////////bGlWEO7////////////wD/////GttjCfD///8AAP/////////////////////0oVsd/////wAA/////////////////////+fFdCK/////AAD/////////////////////7dSOR3D//wAAAP////8A////////////////+OjQpJJjAAAAAAD//wAAAAAA/////////////+DCjV8AAAAAAAD/AAAA/////wD////////////juYVPAAAAAAAA//8AAP//AAAAAP////////////+5dTgAAAAAAP//AAAAAAAAAAAAAAAAAAD/////nk8aAAAAAAD//wAAAAAAAAAA//8AAAD/////olkiAAAAAAD//wAAAAAAAAAA/////wD//wAAomEdAAAAAAD/AwAAAAAAAAAA/////wAAAJVRHgAAAAAA/wAAAAAAAAAA/////wAAAIZGIAAAAAAA/wMAAAAAAAAAAAAAAAAA/5VPGgAAAAAA/wAAAAAAAAAA//8AAAAA//+iWijA//8AAP//AAAAAAAAAAAAAAAAAAD/omIfAAD//wD/AAAA//8AAAAAAAAAAAD//6JYGwAA//8AAAAAAAAAAAAAAAAAAAD//5NOHgAA//8AAAAAAAAAAAAA//8AAAD//5ZNGwAA//8AAAAAAAAAAAAA//8AAAD//5RJGwAA/wAAAAAAAAD//wAAAAAAAAD//5NFGwAA/wAAAAAAAP//AAAAAAAA//8A/5ZIGgAA/wAAAAAA//8AAAAAAAAAAAAA/5ZHGgAA/wAAAAD//wAAAAAAAAAAAAD//5ZHGAAA/wAAAAD//wAAAAAAAAAA/wAA/5dFGAAA/wAAAAD//wAAAAAAAAAA//8A/5ZEFwAA/wAAAAD//wAAAAAAAAAA//8A/5ZCFgAA/wAAAP//AAAAAAAAAAAA////lEEVAAD/AAAA//8AAAAAAAAAAAD////nwmYKAAAAAAAA//8AAAAAAAAAAAAAAAD///+XRxj///8AAAAAAAAAAP//AAAAAAAAAAAA////jzsS////AAD//wAAAAAAAAAAAAAAAAAA//+MPxQAAAAA/wAAAP//AAAAAAAAAAAA//8AAP+MNgwAAAAA/wAA//8AAAAAAAD/////AAAAAAAA/5ZHGsD/AAAAAPB/YsD//wAA/////wAAAAD//wAAAAAAAADwf2LA//8AAAD/AAAAAAAA//8AAAAAAAAA8H9iwP//AAAAAAAAAAAAAAAAAAAA/H9S8P//AAAAAAAAAAAAAAAAAAC//wDAAAAAAAAAAAAAAAAAAAAAAAAAAP/AVAgAAGQDQAOAAAAAAAAAAAAAAAAAAGQDQAOAAAAAAAAAAAAAAAAAACgCwAMAAAAAAAAAAAAAAAAAABQCQAKAAAAAAAAAAAAAAAWAAAP8BgAGAAAAAAAAAAAAAAWAAAP8BgAGAAAAAAIAAAAFgAAD/AVABUAAAAACAAAAAYAAAAKAAYABgAAAAAIAAAABgAAAAoABgAGAAAAAAgAAAABgAAACAAGAAYAAAAACAAAAAGAAAAIAAYABgAAAAAAAA/QAAAAACAIAAAAAAAAAAAAAA8H9iwP//AAAAAAAAAAAAAAAAAAAA/H9S8P//AAAAAAAAAAAAAAAAAAC//wDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                                audio.play();
+                            } catch (e) {
+                                console.error("Could not play notification sound");
+                            }
+                            
+                            clearInterval(statusCheckInterval);
+                        } else {
+                            packageStatus.style.display = 'none';
+                        }
+                        
+                        // Handle recharging notification
+                        if (data.status.toLowerCase().includes("recharging") || data.status.toLowerCase().includes("low battery")) {
+                            rechargeStatus.style.display = 'block';
+                            rechargeStatus.innerText = data.status.includes("stop") ? 
+                                '⚡ ROVER STOPPED - CRITICAL BATTERY LEVEL - RECHARGING ⚡' : 
+                                '⚡ ROVER IS RECHARGING... ⚡';
+                            rechargeStatus.style.backgroundColor = '#ffebee';
+                            rechargeStatus.style.borderColor = '#f44336';
+                            rechargeStatus.style.color = '#b71c1c';
+                        } else if (data.status.includes("recharged")) {
+                            rechargeStatus.style.display = 'block';
+                            rechargeStatus.innerText = 'ROVER RECHARGED, CONTINUING MISSION FROM PREVIOUS POSITION';
+                            rechargeStatus.style.backgroundColor = '#e8f5e9';
+                            rechargeStatus.style.borderColor = '#4CAF50';
+                            rechargeStatus.style.color = '#2E7D32';
+                            // Fade out recharge message after 5 seconds
+                            setTimeout(() => {
+                                rechargeStatus.style.display = 'none';
+                            }, 5000);
+                        } else {
+                            rechargeStatus.style.display = 'none';
+                        }
+                        
+                        if (data.status === "Completed" || data.status.includes("Failed") || 
+                            data.status.includes("Supply Dropped")) {
+                            clearInterval(statusCheckInterval);
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('Error checking navigation status:', error);
+                }
+            }, 2000); // Check every 2 seconds
+        }
+        
+        // Get position data
+        async function getPositionData() {
+            try {
+                const response = await fetch('/position-data');
+                const data = await response.json();
+                
+                if (data.initial_position) {
+                    document.getElementById('initial-position').innerText = 
+                        `X: ${data.initial_position.x}, Y: ${data.initial_position.y}`;
+                }
+                
+                if (data.final_position) {
+                    document.getElementById('final-position').innerText = 
+                        `X: ${data.final_position.x}, Y: ${data.final_position.y}`;
+                }
+            } catch (error) {
+                console.error('Error fetching position data:', error);
+            }
+        }
+
+        // Display messages to the user
+        function displayMessage(message, type) {
+            const messageElement = document.getElementById('message');
+            messageElement.innerText = message;
+            messageElement.className = type;
+            
+            // Clear message after 5 seconds
+            setTimeout(() => {
+                messageElement.innerText = '';
+                messageElement.className = '';
+            }, 5000);
+        }
+
+        // Add event listener for page unload to clean up intervals
+        window.addEventListener('beforeunload', () => {
+            stopAutoRefresh();
+        });
+        
+        // Fetch position data when page loads if session exists
+        document.addEventListener('DOMContentLoaded', () => {
+            const sessionId = document.getElementById('session-id').innerText;
+            if (sessionId !== 'Not Started') {
+                getPositionData();
+            }
+        });
+    </script>
+</body>
+</html>
