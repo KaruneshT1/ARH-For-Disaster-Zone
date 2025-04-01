@@ -110,6 +110,34 @@
     </div>
 
     <script>
+        // Auto-refresh interval (in milliseconds)
+        const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds
+        let autoRefreshIntervalId = null;
+        
+        // Function to start auto-refresh of sensor data
+        function startAutoRefresh() {
+            // Clear any existing interval first
+            if (autoRefreshIntervalId) {
+                clearInterval(autoRefreshIntervalId);
+            }
+            
+            // Set up new interval for auto-refresh
+            autoRefreshIntervalId = setInterval(() => {
+                // Only refresh if we have an active session
+                if (document.getElementById('session-id').innerText !== 'Not Started') {
+                    fetchSensorData(false); // Don't show success message for auto-refresh
+                }
+            }, AUTO_REFRESH_INTERVAL);
+        }
+        
+        // Function to stop auto-refresh
+        function stopAutoRefresh() {
+            if (autoRefreshIntervalId) {
+                clearInterval(autoRefreshIntervalId);
+                autoRefreshIntervalId = null;
+            }
+        }
+
         // Start a new session
         async function startSession() {
             try {
@@ -120,8 +148,12 @@
                     document.getElementById('session-id').innerText = data.session_id;
                     displayMessage('Session started successfully!', 'success');
                     
-                    // Fetch initial rover status
-                    fetchRoverStatus();
+                    // Fetch initial rover status and sensor data
+                    await fetchRoverStatus();
+                    await fetchSensorData();
+                    
+                    // Start auto-refresh when session starts
+                    startAutoRefresh();
                 } else {
                     displayMessage('Failed to start session: ' + (data.error || 'Unknown error'), 'error');
                 }
@@ -144,65 +176,109 @@
                 document.getElementById('rover-status').innerText = data.status || 'Unknown';
                 document.getElementById('battery-level').innerText = (data.battery ? data.battery + '%' : 'Unknown');
                 document.getElementById('communication-status').innerText = data.communication_status || 'Unknown';
+                
+                // Also fetch sensor data when status is updated
+                await fetchSensorData(false); // Don't show success message to avoid too many notifications
+                
                 displayMessage('Status updated', 'success');
             } catch (error) {
                 displayMessage('Error fetching status: ' + error.message, 'error');
             }
         }
 
-        // Fetch sensor data
-        async function fetchSensorData() {
+        // Fetch sensor data with optional message display
+        async function fetchSensorData(showMessage = true) {
             try {
                 const response = await fetch('/rover/sensor-data');
                 const data = await response.json();
                 
                 if (data.error) {
-                    displayMessage(data.error, 'error');
+                    if (showMessage) displayMessage(data.error, 'error');
                     return;
                 }
+                
+                console.log("Raw sensor data:", data); // Log the data for debugging
                 
                 // Updated to create a structured view of the sensor data
                 let sensorHTML = '<div class="sensor-grid">';
                 
-                // IR Sensor - displays boolean reflection value
+                // Timestamp
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Timestamp</h3>
+                        <p>Time: <span class="sensor-value">${data.readable_time || 'N/A'}</span></p>
+                        <p>Unix: <span class="sensor-value">${data.timestamp || 'N/A'}</span></p>
+                    </div>`;
+                
+                // Battery and Recharging Status
+                sensorHTML += `
+                    <div class="sensor-box">
+                        <h3>Power Status</h3>
+                        <p>Battery: <span class="sensor-value">${
+                            data.battery_level !== undefined ? 
+                            data.battery_level + '%' : 
+                            (data.battery !== undefined ? data.battery + '%' : 'N/A')
+                        }</span></p>
+                        <p>Recharging: <span class="sensor-value">${data.recharging === true ? 'Yes' : 'No'}</span></p>
+                    </div>`;
+                
+                // IR Sensor
                 sensorHTML += `
                     <div class="sensor-box">
                         <h3>IR Sensor</h3>
-                        <p>Reflection Detected: <span class="sensor-value">${data.ir === true ? 'Yes' : 'No'}</span></p>
+                        <p>Reflection: <span class="sensor-value">${
+                            data.ir ? 
+                            (data.ir.reflection === true ? 'Yes (true)' : 'No (false)') : 
+                            'N/A'
+                        }</span></p>
                     </div>`;
                 
-                // Position - ensure all coordinates are properly extracted
+                // Position
                 sensorHTML += `
                     <div class="sensor-box">
                         <h3>Position</h3>
-                        <p>X: <span class="sensor-value">${data.position && data.position.x !== undefined ? data.position.x : 'N/A'}</span></p>
-                        <p>Y: <span class="sensor-value">${data.position && data.position.y !== undefined ? data.position.y : 'N/A'}</span></p>
-                        <p>Z: <span class="sensor-value">${data.position && data.position.z !== undefined ? data.position.z : 'N/A'}</span></p>
+                        <p>X: <span class="sensor-value">${data.position ? data.position.x || 'N/A' : 'N/A'}</span></p>
+                        <p>Y: <span class="sensor-value">${data.position ? data.position.y || 'N/A' : 'N/A'}</span></p>
                     </div>`;
                 
                 // Accelerometer
                 sensorHTML += `
                     <div class="sensor-box">
                         <h3>Accelerometer</h3>
-                        <p>X: <span class="sensor-value">${data.accelerometer && data.accelerometer.x !== undefined ? data.accelerometer.x : 'N/A'}</span></p>
-                        <p>Y: <span class="sensor-value">${data.accelerometer && data.accelerometer.y !== undefined ? data.accelerometer.y : 'N/A'}</span></p>
-                        <p>Z: <span class="sensor-value">${data.accelerometer && data.accelerometer.z !== undefined ? data.accelerometer.z : 'N/A'}</span></p>
+                        <p>X: <span class="sensor-value">${data.accelerometer ? data.accelerometer.x || 'N/A' : 'N/A'}</span></p>
+                        <p>Y: <span class="sensor-value">${data.accelerometer ? data.accelerometer.y || 'N/A' : 'N/A'}</span></p>
+                        <p>Z: <span class="sensor-value">${data.accelerometer ? data.accelerometer.z || 'N/A' : 'N/A'}</span></p>
                     </div>`;
                 
-                // Ultrasonic - displays both distance and detection status
+                // Ultrasonic
                 sensorHTML += `
                     <div class="sensor-box">
                         <h3>Ultrasonic</h3>
-                        <p>Distance: <span class="sensor-value">${data.ultrasonic && data.ultrasonic.distance !== undefined ? data.ultrasonic.distance + ' cm' : 'N/A'}</span></p>
-                        <p>Object Detected: <span class="sensor-value">${data.ultrasonic && data.ultrasonic.detection === true ? 'Yes' : 'No'}</span></p>
+                        <p>Distance: <span class="sensor-value">${
+                            data.ultrasonic ? 
+                            (data.ultrasonic.distance !== null ? 
+                                data.ultrasonic.distance + ' cm' : 'No reading') : 
+                            'N/A'
+                        }</span></p>
+                        <p>Object Detected: <span class="sensor-value">${
+                            data.ultrasonic ? 
+                            (data.ultrasonic.detection === true ? 'Yes' : 'No') : 
+                            'N/A'
+                        }</span></p>
                     </div>`;
                 
-                // RFID - displays tag_detected as boolean
+                // RFID
                 sensorHTML += `
                     <div class="sensor-box">
                         <h3>RFID</h3>
-                        <p>Tag Detected: <span class="sensor-value">${data.rfid && data.rfid.tag_detected === true ? 'Yes' : 'No'}</span></p>
-                        ${data.rfid && data.rfid.tag_id ? `<p>Tag ID: <span class="sensor-value">${data.rfid.tag_id}</span></p>` : ''}
+                        <p>Tag Detected: <span class="sensor-value">${
+                            data.rfid ? 
+                            (data.rfid.tag_detected === true ? 'Yes' : 'No') : 
+                            'N/A'
+                        }</span></p>
+                        ${data.rfid && data.rfid.tag_id ? 
+                          `<p>Tag ID: <span class="sensor-value">${data.rfid.tag_id}</span></p>` : 
+                          ''}
                     </div>`;
                 
                 // Communication Status
@@ -216,14 +292,23 @@
                 
                 document.getElementById('sensor-data').innerHTML = sensorHTML;
                 
-                // Update communication status in the main status panel
+                // Update main status panel with the latest data
                 if (data.communication_status) {
                     document.getElementById('communication-status').innerText = data.communication_status;
                 }
+                if (data.battery_level !== undefined) {
+                    document.getElementById('battery-level').innerText = data.battery_level + '%';
+                } else if (data.battery !== undefined) {
+                    document.getElementById('battery-level').innerText = data.battery + '%';
+                }
                 
-                displayMessage('Sensor data retrieved', 'success');
+                if (showMessage) {
+                    displayMessage('Sensor data retrieved', 'success');
+                }
             } catch (error) {
-                displayMessage('Error fetching sensor data: ' + error.message, 'error');
+                if (showMessage) {
+                    displayMessage('Error fetching sensor data: ' + error.message, 'error');
+                }
             }
         }
 
@@ -237,8 +322,12 @@
                     displayMessage(data.error, 'error');
                 } else {
                     displayMessage(data.message || 'Rover moved successfully', 'success');
-                    // Refresh status after movement
-                    setTimeout(fetchRoverStatus, 1000);
+                    
+                    // Refresh data after movement with delay to allow server to update
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
                 }
             } catch (error) {
                 displayMessage('Error moving rover: ' + error.message, 'error');
@@ -255,8 +344,12 @@
                     displayMessage(data.error, 'error');
                 } else {
                     displayMessage(data.message || 'Rover is recharging', 'success');
-                    // Refresh status after recharge command
-                    setTimeout(fetchRoverStatus, 1000);
+                    
+                    // Refresh data after recharge command
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
                 }
             } catch (error) {
                 displayMessage('Error recharging rover: ' + error.message, 'error');
@@ -273,8 +366,12 @@
                     displayMessage(data.error, 'error');
                 } else {
                     displayMessage(data.message || 'Rover stopped', 'success');
-                    // Refresh status after stop command
-                    setTimeout(fetchRoverStatus, 1000);
+                    
+                    // Refresh data after stop command
+                    setTimeout(async () => {
+                        await fetchRoverStatus();
+                        await fetchSensorData(false); // Don't show success message for this refresh
+                    }, 1000);
                 }
             } catch (error) {
                 displayMessage('Error stopping rover: ' + error.message, 'error');
@@ -294,7 +391,12 @@
             }, 5000);
         }
 
-        // Start session on page load (optional - uncomment to automatically start session)
+        // Add event listener for page unload to clean up intervals
+        window.addEventListener('beforeunload', () => {
+            stopAutoRefresh();
+        });
+
+        // Optionally auto-start session when page loads
         // window.onload = startSession;
     </script>
 </body>
