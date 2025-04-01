@@ -1,6 +1,8 @@
 import numpy as np
 import heapq
 import logging
+import time
+import os
 
 # Set up logging
 logging.basicConfig(filename='slam.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -10,9 +12,9 @@ class SLAMError(Exception):
     pass
 
 class RoverSLAM:
-    def __init__(self, map_size=(50, 50)):
+    def __init__(self, map_size=(20, 20)):
         """
-        Initialize the SLAM system with a map of given size (default 50x50 grid).
+        Initialize the SLAM system with a map of given size (default 20x20 grid).
         The grid map stores the environment (0 for free space, 1 for obstacles).
         """
         if not (isinstance(map_size, tuple) and len(map_size) == 2 and all(isinstance(i, int) and i > 0 for i in map_size)):
@@ -26,41 +28,11 @@ class RoverSLAM:
 
         logging.info(f"SLAM system initialized with map size {map_size}")
 
-    def update_map(self, sensor_data, position, angle):
-        """
-        Update the map based on sensor data. Marks detected obstacles and updates rover position.
-        """
-        try:
-            if not (isinstance(sensor_data, list) and isinstance(position, tuple) and isinstance(angle, (int, float))):
-                raise SLAMError("Invalid input data format for SLAM update.")
-
-            x, y = position
-            if not (0 <= x < self.map.shape[0] and 0 <= y < self.map.shape[1]):
-                raise SLAMError(f"Invalid position {position}. Out of map bounds.")
-
-            self.position = position
-            self.orientation = angle
-            logging.info(f"Updated SLAM position: {position}, Orientation: {angle}")
-
-            for sensor in sensor_data:
-                if not isinstance(sensor, dict) or 'distance' not in sensor or 'angle' not in sensor:
-                    raise SLAMError("Sensor data must be a list of dictionaries with 'distance' and 'angle' keys.")
-
-                distance = sensor['distance']
-                sensor_angle = sensor['angle']
-
-                if not (isinstance(distance, (int, float)) and distance >= 0):
-                    raise SLAMError(f"Invalid distance value: {distance}")
-
-                obstacle_x = x + int(distance * np.cos(np.radians(sensor_angle)))
-                obstacle_y = y + int(distance * np.sin(np.radians(sensor_angle)))
-
-                if 0 <= obstacle_x < self.map.shape[0] and 0 <= obstacle_y < self.map.shape[1]:
-                    self.map[obstacle_x][obstacle_y] = 1  # Mark obstacle
-                    logging.info(f"Obstacle detected at ({obstacle_x}, {obstacle_y})")
-
-        except SLAMError as e:
-            logging.error(f"SLAM Update Error: {str(e)}")
+    def set_obstacles(self, obstacle_positions):
+        """Manually set obstacles on the map for testing."""
+        for obs in obstacle_positions:
+            if 0 <= obs[0] < self.map.shape[0] and 0 <= obs[1] < self.map.shape[1]:
+                self.map[obs] = 1
 
     def set_goal(self, goal_position):
         """Sets the goal position for path planning."""
@@ -82,7 +54,6 @@ class RoverSLAM:
         goal = self.goal
         rows, cols = self.map.shape
 
-        # Priority queue for Dijkstra's Algorithm
         pq = [(0, start)]  # (cost, position)
         distances = {start: 0}
         prev_nodes = {start: None}
@@ -101,7 +72,7 @@ class RoverSLAM:
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:  # 4-directional movement
                 next_pos = (x + dx, y + dy)
                 if 0 <= next_pos[0] < rows and 0 <= next_pos[1] < cols and self.map[next_pos] == 0:
-                    new_cost = current_cost + 1  # Uniform cost for each movement
+                    new_cost = current_cost + 1
                     if next_pos not in distances or new_cost < distances[next_pos]:
                         distances[next_pos] = new_cost
                         prev_nodes[next_pos] = current_position
@@ -116,51 +87,51 @@ class RoverSLAM:
         path.reverse()
 
         if path and path[0] == start:
-            self.path = path
+            self.path = path[1:]  # Remove starting position
             logging.info(f"Path found: {path}")
         else:
             logging.error("No valid path found.")
             self.path = []
 
     def move_to_next_position(self):
-        """Moves the rover along the planned path. If blocked, it triggers autonomous decision-making."""
+        """Moves the rover along the planned path, updating the map display."""
         if not self.path:
             logging.warning("No path available. Rover cannot move.")
-            return
+            return False
 
-        next_position = self.path.pop(0)
-        if self.map[next_position] == 1:
-            logging.warning(f"Path blocked at {next_position}. Autonomous decision required.")
-            self.autonomous_decision()
-        else:
-            self.position = next_position
-            logging.info(f"Rover moved to {next_position}")
-
-    def autonomous_decision(self):
-        """Handles obstacle avoidance when the planned path is blocked (placeholder)."""
-        logging.info("Autonomous decision-making triggered. (Implementation pending integration with ultrasonic)")
-        # TODO: Implement real-time decision-making using ultrasonic data
-
-    def send_data(self):
-        """Prepares rover data for transmission."""
-        data = {
-            "position": self.position,
-            "orientation": self.orientation,
-            "goal": self.goal,
-            "obstacles": np.argwhere(self.map == 1).tolist(),
-            "path": self.path
-        }
-        logging.info(f"Data transmission: {data}")
-        return data
+        self.position = self.path.pop(0)
+        logging.info(f"Rover moved to {self.position}")
+        return True
 
     def display_map(self):
-        """Displays the SLAM map."""
-        try:
-            if self.map.size == 0:
-                raise SLAMError("SLAM map is empty. Cannot display.")
+        """Displays the SLAM map with obstacles, rover, goal, and path."""
+        os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal screen
 
-            for row in self.map:
-                print(" ".join(str(int(cell)) for cell in row))
+        display_grid = np.full(self.map.shape, '.', dtype=str)
 
-        except SLAMError as e:
-            logging.error(f"SLAM Display Error: {str(e)}")
+        # Mark obstacles
+        obstacle_positions = np.argwhere(self.map == 1)
+        for x, y in obstacle_positions:
+            display_grid[x, y] = '#'
+
+        # Mark path
+        for px, py in self.path:
+            display_grid[px, py] = '*'
+
+        # Mark rover and goal
+        x, y = self.position
+        display_grid[x, y] = 'R'
+        if self.goal:
+            gx, gy = self.goal
+            display_grid[gx, gy] = 'G'
+
+        # Print the map
+        for row in display_grid:
+            print(" ".join(row))
+        print("\n")
+
+    def simulate_movement(self, delay=0.5):
+        """Simulates rover movement step by step with visualization."""
+        while self.move_to_next_position():
+            self.display_map()
+            time.sleep(delay)
