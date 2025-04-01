@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Autonomous Rescue Rover</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Autonomous Rescue Rover Control Center</h1>
+        
+        <div class="status-panel">
+            <h2>Rover Status</h2>
+            <div class="status-item">
+                <span>Battery:</span>
+                <span id="battery-level">100%</span>
+                <div class="battery-indicator">
+                    <div id="battery-fill" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="status-item">
+                <span>Position:</span>
+                <span id="position">(0,0)</span>
+            </div>
+            <div class="status-item">
+                <span>Status:</span>
+                <span id="status">Operational</span>
+            </div>
+            <div class="status-item">
+                <span>Communication:</span>
+                <span id="communication">Connected</span>
+            </div>
+            <div class="status-item">
+                <span>Survivors Found:</span>
+                <span id="survivors">0</span>
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <h2>Navigation Map</h2>
+            <canvas id="map-canvas" width="500" height="500"></canvas>
+        </div>
+        
+        <div class="control-panel">
+            <h2>Manual Controls</h2>
+            <div class="control-buttons">
+                <button id="btn-forward">Forward</button>
+                <div class="control-row">
+                    <button id="btn-left">Left</button>
+                    <button id="btn-stop">STOP</button>
+                    <button id="btn-right">Right</button>
+                </div>
+                <button id="btn-backward">Backward</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

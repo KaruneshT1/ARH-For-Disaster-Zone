@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Rescue Rover</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .battery-indicator {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .battery-fill {
+            height: 100%;
+            background-color: #28a745;
+            border-radius: 10px;
+            transition: width 0.5s;
+        }
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            margin: 5px;
+            font-size: 24px;
+        }
+        .btn-stop {
+            background-color: #dc3545;
+            color: white;
+        }
+        .sensor-value {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .charging {
+            color: orange;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        #map-container {
+            width: 100%;
+            height: 300px;
+            background-color: #333;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        #rover-icon {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #007bff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.5s;
+        }
+        #connection-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .connected {
+            background-color: #28a745;
+        }
+        .disconnected {
+            background-color: #dc3545;
+        }
+        #error-log {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Autonomous Rescue Rover Control Center</h1>
+        
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        System Control
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <button id="start-btn" class="btn btn-success">Start Mission</button>
+                            <div class="d-flex align-items-center">
+                                <span id="connection-indicator" class="connected"></span>
+                                <span id="connection-text">Connected</span>
+                            </div>
+                            <button id="test-api-btn" class="btn btn-info">Test API</button>
+                            <button id="stop-btn" class="btn btn-danger">Stop Mission</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Rover Status
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <p>Status: <span id="rover-status">Initializing</span></p>
+                                <p>Battery: <span id="battery-level">100%</span></p>
+                                <div class="battery-indicator">
+                                    <div id="battery-fill" class="battery-fill" style="width: 100%"></div>
+                                </div>
+                                <p>Movement: <span id="movement-status">Stopped</span></p>
+                            </div>
+                            <div class="col-6">
+                                <p>Position: (<span id="position-x">0.00</span>, <span id="position-y">0.00</span>)</p>
+                                <p>Mission Time: <span id="mission-time">00:00:00</span></p>
+                                <p>Last Updated: <span id="last-updated">00:00:00</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Manual Control
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <button id="forward-btn" class="btn btn-secondary control-btn">↑</button>
+                        </div>
+                        <div>
+                            <button id="left-btn" class="btn btn-secondary control-btn">←</button>
+                            <button id="stop-movement-btn" class="btn control-btn btn-stop">■</button>
+                            <button id="right-btn" class="btn btn-secondary control-btn">→</button>
+                        </div>
+                        <div class="mt-2">
+                            <button id="backward-btn" class="btn btn-secondary control-btn">↓</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Navigation Map
+                    </div>
+                    <div class="card-body">
+                        <div id="map-container">
+                            <div id="rover-icon"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Sensor Data
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="sensor-data">
+                            <div class="col-6">
+                                <p>Ultrasonic: <span id="ultrasonic-value" class="sensor-value">N/A</span></p>
+                                <p>IR: <span id="ir-value" class="sensor-value">N/A</span></p>
+                            </div>
+                            <div class="col-6">
+                                <p>Accelerometer: <span id="accel-value" class="sensor-value">N/A</span></p>
+                                <p>RFID: <span id="rfid-value" class="sensor-value">N/A</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        Error Log
+                    </div>
+                    <div class="card-body">
+                        <div id="error-log" class="p-2 bg-light">
+                            <p>System initialized. No errors.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for API Test Results -->
+    <div class="modal fade" id="apiTestModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">API Connection Test Results</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="api-test-results" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // UI Elements
+            const roverStatus = document.getElementById('rover-status');
+            const batteryLevel = document.getElementById('battery-level');
+            const batteryFill = document.getElementById('battery-fill');
+            const movementStatus = document.getElementById('movement-status');
+            const positionX = document.getElementById('position-x');
+            const positionY = document.getElementById('position-y');
+            const missionTime = document.getElementById('mission-time');
+            const lastUpdated = document.getElementById('last-updated');
+            const ultrasonicValue = document.getElementById('ultrasonic-value');
+            const irValue = document.getElementById('ir-value');
+            const accelValue = document.getElementById('accel-value');
+            const rfidValue = document.getElementById('rfid-value');
+            const errorLog = document.getElementById('error-log');
+            const connectionIndicator = document.getElementById('connection-indicator');
+            const connectionText = document.getElementById('connection-text');
+            const roverIcon = document.getElementById('rover-icon');
+            const mapContainer = document.getElementById('map-container');
+            const apiTestResults = document.getElementById('api-test-results');
+            
+            // Buttons
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const testApiBtn = document.getElementById('test-api-btn');
+            const forwardBtn = document.getElementById('forward-btn');
+            const backwardBtn = document.getElementById('backward-btn');
+            const leftBtn = document.getElementById('left-btn');
+            const rightBtn = document.getElementById('right-btn');
+            const stopMovementBtn = document.getElementById('stop-movement-btn');
+            
+            // Bootstrap modal
+            const apiTestModal = new bootstrap.Modal(document.getElementById('apiTestModal'));
+            
+            // Position rover icon in center of map initially
+            const mapWidth = mapContainer.offsetWidth;
+            const mapHeight = mapContainer.offsetHeight;
+            roverIcon.style.left = (mapWidth / 2) + 'px';
+            roverIcon.style.top = (mapHeight / 2) + 'px';
+            
+            // Update rover position on map
+            function updateRoverPosition(x, y) {
+                // Map rover coordinates to screen coordinates
+                // This is a simplified mapping - you might need to adjust for your coordinate system
+                const screenX = (mapWidth / 2) + (x * 10); // Scale by 10 for visibility
+                const screenY = (mapHeight / 2) - (y * 10); // Y is inverted in screen coordinates
+                
+                roverIcon.style.left = screenX + 'px';
+                roverIcon.style.top = screenY + 'px';
+            }
+            
+            // Format time
+            function formatTime(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            
+            // Update UI with rover status
+            function updateStatus() {
+                fetch('/api/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update basic status
+                        roverStatus.textContent = data.status;
+                        batteryLevel.textContent = data.battery_level + '%';
+                        batteryFill.style.width = data.battery_level + '%';
+                        
+                        // Change battery color based on level
+                        if (data.battery_level < 10) {
+                            batteryFill.style.backgroundColor = '#dc3545'; // Red
+                        } else if (data.battery_level < 30) {
+                            batteryFill.style.backgroundColor = '#ffc107'; // Yellow
+                        } else {
+                            batteryFill.style.backgroundColor = '#28a745'; // Green
+                        }
+                        
+                        // Update movement status
+                        if (data.is_moving) {
+                            movementStatus.textContent = `Moving ${data.current_direction}`;
+                        } else if (data.is_charging) {
+                            movementStatus.textContent = 'Charging';
+                            roverStatus.classList.add('charging');
+                        } else {
+                            movementStatus.textContent = 'Stopped';
+                            roverStatus.classList.remove('charging');
+                        }
+                        
+                        // Update position
+                        positionX.textContent = data.position.x.toFixed(2);
+                        positionY.textContent = data.position.y.toFixed(2);
+                        updateRoverPosition(data.position.x, data.position.y);
+                        
+                        // Update times
+                        missionTime.textContent = formatTime(data.mission_time);
+                        const lastUpdateTime = Math.floor((new Date().getTime() / 1000) - data.last_updated);
+                        lastUpdated.textContent = lastUpdateTime + ' seconds ago';
+                        
+                        // Update communication status
+                        if (data.has_communication) {
+                            connectionIndicator.className = 'connected';
+                            connectionText.textContent = 'Connected';
+                            
+                            // Enable control buttons
+                            [forwardBtn, backwardBtn, leftBtn, rightBtn, stopMovementBtn].forEach(btn => {
+                                btn.disabled = data.is_charging;
+                            });
+                        } else {
+                            connectionIndicator.className = 'disconnected';
+                            connectionText.textContent = 'Disconnected';
+                            
+                            // Disable control buttons
+                            [forwardBtn, backwardBtn, leftBtn, rightBtn, stopMovementBtn].forEach(btn => {
+                                btn.disabled = true;
+                            });
+                        }
+                        
+                        // Update sensor data if available
+                        if (data.sensor_data) {
+                            const sensors = data.sensor_data;
+                            
+                            if (sensors.ultrasonic) {
+                                ultrasonicValue.textContent = sensors.ultrasonic.distance ? 
+                                    sensors.ultrasonic.distance + ' cm' : 'N/A';
+                            }
+                            
+                            if (sensors.ir) {
+                                irValue.textContent = sensors.ir.heat_signature ? 
+                                    sensors.ir.heat_signature + '°C' : 'N/A';
+                            }
+                            
+                            if (sensors.accelerometer) {
+                                const accel = sensors.accelerometer;
+                                accelValue.textContent = `x:${accel.x.toFixed(2)} y:${accel.y.toFixed(2)} z:${accel.z.toFixed(2)}`;
+                            }
+                            
+                            if (sensors.rfid) {
+                                rfidValue.textContent = sensors.rfid.detected ? 
+                                    'Detected: ' + sensors.rfid.id : 'Not detected';
+                            }
+                        }
+                        
+                        // Update error log
+                        if (data.errors && data.errors.length > 0) {
+                            // Add only new errors
+                            const currentErrors = errorLog.textContent;
+                            const newErrors = data.errors.filter(error => !currentErrors.includes(error));
+                            
+                            if (newErrors.length > 0) {
+                                newErrors.forEach(error => {
+                                    const errorElement = document.createElement('p');
+                                    errorElement.className = 'text-danger';
+                                    errorElement.textContent = new Date().toLocaleTimeString() + ': ' + error;
+                                    errorLog.appendChild(errorElement);
+                                });
+                                
+                                // Scroll to bottom
+                                errorLog.scrollTop = errorLog.scrollHeight;
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching status:', error);
+                        const errorElement = document.createElement('p');
+                        errorElement.className = 'text-danger';
+                        errorElement.textContent = new Date().toLocaleTimeString() + ': Error fetching rover status';
+                        errorLog.appendChild(errorElement);
+                        errorLog.scrollTop = errorLog.scrollHeight;
+                    });
+            }
+            
+            // Start button
+            startBtn.addEventListener('click', function() {
+                fetch('/api/start')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'started' || data.status === 'already running') {
+                            startBtn.disabled = true;
+                            stopBtn.disabled = false;
+                            const statusMsg = document.createElement('p');
+                            statusMsg.className = 'text-success';
+                            statusMsg.textContent = new Date().toLocaleTimeString() + ': Mission started';
+                            errorLog.appendChild(statusMsg);
+                            errorLog.scrollTop = errorLog.scrollHeight;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error starting mission:', error);
+                    });
+            });
+            
+            // Stop button
+            stopBtn.addEventListener('click', function() {
+                fetch('/api/stop')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'stopped') {
+                            startBtn.disabled = false;
+                            stopBtn.disabled = true;
+                            const statusMsg = document.createElement('p');
+                            statusMsg.className = 'text-warning';
+                            statusMsg.textContent = new Date().toLocaleTimeString() + ': Mission stopped';
+                            errorLog.appendChild(statusMsg);
+                            errorLog.scrollTop = errorLog.scrollHeight;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error stopping mission:', error);
+                    });
+            });
+            
+            // Test API button
+            testApiBtn.addEventListener('click', function() {
+                testApiBtn.disabled = true;
+                testApiBtn.textContent = 'Testing...';
+                
+                fetch('/api/test-connection')
+                    .then(response => response.json())
+                    .then(data => {
+                        apiTestResults.textContent = JSON.stringify(data, null, 2);
+                        apiTestModal.show();
+                        
+                        // Log summary of results
+                        const statusMsg = document.createElement('p');
+                        statusMsg.textContent = new Date().toLocaleTimeString() + ': API test completed';
+                        errorLog.appendChild(statusMsg);
+                        errorLog.scrollTop = errorLog.scrollHeight;
+                    })
+                    .catch(error => {
+                        console.error('Error testing API:', error);
+                        apiTestResults.textContent = 'Error testing API: ' + error;
+                        apiTestModal.show();
+                    })
+                    .finally(() => {
+                        testApiBtn.disabled = false;
+                        testApiBtn.textContent = 'Test API';
+                    });
+            });
+            
+            // Control buttons
+            function sendCommand(command) {
+                fetch('/api/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: command })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        const errorElement = document.createElement('p');
+                        errorElement.className = 'text-danger';
+                        errorElement.textContent = new Date().toLocaleTimeString() + ': ' + data.error;
+                        errorLog.appendChild(errorElement);
+                        errorLog.scrollTop = errorLog.scrollHeight;
+                    } else {
+                        const statusMsg = document.createElement('p');
+                        statusMsg.className = 'text-info';
+                        statusMsg.textContent = new Date().toLocaleTimeString() + ': ' + data.status;
+                        errorLog.appendChild(statusMsg);
+                        errorLog.scrollTop = errorLog.scrollHeight;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending command:', error);
+                });
+            }
+            
+            forwardBtn.addEventListener('click', () => sendCommand('forward'));
+            backwardBtn.addEventListener('click', () => sendCommand('backward'));
+            leftBtn.addEventListener('click', () => sendCommand('left'));
+            rightBtn.addEventListener('click', () => sendCommand('right'));
+            stopMovementBtn.addEventListener('click', () => sendCommand('stop'));
+            
+            // Update status every second
+            updateStatus();
+            setInterval(updateStatus, 1000);
+        });
+    </script>
+</body>
+</html>
