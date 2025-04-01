@@ -43,17 +43,20 @@ class BatteryManager:
             "recharging": self.recharging
         }
 
+# Updated recharge_battery method
     def recharge_battery(self):
         """Recharges the battery if it is below the threshold."""
         if self.battery_level < self.recharge_threshold and not self.recharging:
             print("Starting recharging...")
             self.recharging = True
-            while self.battery_level < self.recharge_threshold:
-                self.battery_level += 1  # Simulating recharging by incrementing the battery level
-                # In a real scenario, you would control the charge rate and simulate delay
+            
+            # Simulate the recharging process (increase battery in realistic increments)
+            self.battery_level = min(self.battery_level + 5, self.recharge_threshold)  # Recharge in steps
+            
             self.recharging = False
             self.communication_status = "Active" if self.battery_level > self.low_battery_threshold else "Inactive"
             print(f"Recharging complete. Battery level: {self.battery_level}%")
+
 
     def stop_recharge(self):
         """Stops recharging once the battery is sufficient."""
