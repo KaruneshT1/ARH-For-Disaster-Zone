@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-from rover_navigation import RoverNavigation
+from navigation import RoverNavigation
 from api_comm import APIComm
 
 app = Flask(__name__)
