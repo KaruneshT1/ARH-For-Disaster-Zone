@@ -1,0 +1,84 @@
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+.container { padding: 20px; max-width: 800px; margin: 0 auto; }
+.status { margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
+.status p { margin: 5px 0; }
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 15px;
+}
+.sensor-box {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 12px;
+    background-color: #f8f9fa;
+}
+h2 { margin-top: 30px; color: #333; text-align: center; }
+.session-controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+.sensor-box h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 16px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+.sensor-value {
+    font-weight: bold;
+    color: #2196F3;
+}
+/* New styles for position information */
+.position-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #e8f5e9;
+    border-radius: 5px;
+}
+
+/* New styles for package status and recharge status */
+.package-status {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e8f5e9;
+    border: 2px solid #4CAF50;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+    color: #2E7D32;
+}
+
+.recharge-status {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e3f2fd;
+    border: 2px solid #2196F3;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+    color: #0D47A1;
+}
+.controls { margin: 20px 0; display: flex; flex-direction: column; align-items: center; }
+.direction-pad { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 5px; margin-bottom: 20px; }
+.direction-pad button { height: 60px; width: 80px; font-weight: bold; }
+.direction-pad .center { visibility: hidden; }
+.utility-controls { display: flex; justify-content: center; gap: 15px; margin-top: 10px; }
+.utility-controls button { width: 130px; }
+.sensor-data { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; }
+.error { color: red; padding: 10px; background-color: #ffebee; border-radius: 4px; margin: 10px 0; }
+.success { color: green; padding: 10px; background-color: #e8f5e9; border-radius: 4px; margin: 10px 0; }
+#message { margin-top: 15px; }
+
+.center-align {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.auto-navigate {
+    background-color: #FF9800;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
